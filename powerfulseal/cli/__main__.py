@@ -286,6 +286,16 @@ def check_valid_port(value):
     return parsed
 
 
+def load_policy_file_fn(policy_file, logger):
+    def load_policy():
+        # read and validate the policy
+        policy = PolicyRunner.load_file(policy_file)
+        if not PolicyRunner.is_policy_valid(policy):
+            logger.error("Policy not valid. See log output above.")
+            return sys.exit(1)
+        return policy
+    return load_policy
+
 def parse_args(args):
     parser = ArgumentParser(
         config_file_parser_class=YAMLConfigFileParser,
@@ -605,11 +615,7 @@ def main(argv):
     ##########################################################################
     if args.mode == 'autonomous':
 
-        # read and validate the policy
-        policy = PolicyRunner.load_file(args.policy_file)
-        if not PolicyRunner.is_policy_valid(policy):
-            logger.error("Policy not valid. See log output above.")
-            return sys.exit(1)
+        load_policy_fn = load_policy_file_fn(args.policy_file, logger)
 
         # run the metrics server if requested
         if not args.headless:
@@ -618,16 +624,17 @@ def main(argv):
             start_server(
                 host=args.host,
                 port=args.port,
-                policy=policy,
+                load_policy_fn=load_policy_fn,
                 accept_proxy_headers=args.accept_proxy_headers,
                 logger=server_log_handler,
             )
+            #TODO do I need to return policy always as load policy?
         else:
             logger.info("NOT starting the UI server")
 
         logger.info("STARTING AUTONOMOUS MODE")
         success = PolicyRunner.run(
-            policy,
+            load_policy_fn,
             inventory,
             k8s_inventory,
             driver,

@@ -47,14 +47,16 @@ def logs():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def index(path):
+    load_policy_fn = config.get("load_policy_fn")
+    policy = load_policy_fn()
     return render_template('index.html.j2',
-        policy=yaml.dump(config.get("policy")),
+        policy=yaml.dump(policy),
     )
 
-def start_server(host, port, policy, accept_proxy_headers=False, logger=None):
+def start_server(host, port, load_policy_fn, accept_proxy_headers=False, logger=None):
     if accept_proxy_headers:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
-    config["policy"] = policy
+    config["load_policy_fn"] = load_policy_fn
     config["logger"] = logger
     threading.Thread(target=app.run, args=(host, port), daemon=True).start()
 

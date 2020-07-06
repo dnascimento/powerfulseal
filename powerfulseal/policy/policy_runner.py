@@ -55,30 +55,33 @@ class PolicyRunner():
         return True
 
     @classmethod
-    def run(cls, policy, inventory, k8s_inventory, driver, executor,
+    def run(cls, load_policy_fn, inventory, k8s_inventory, driver, executor,
             metric_collector=None):
         """ Runs a policy forever
         """
-        config = policy.get("config", {}).get("runStrategy", {})
-        should_randomize = config.get("strategy") == "random"
-        wait_min = config.get("minSecondsBetweenRuns", 0)
-        wait_max = config.get("maxSecondsBetweenRuns", 300)
-        loops = config.get("runs", None)
-        exitConfig = policy.get("config", {}).get("exitStrategy", {})
-        exitStrategy = exitConfig.get("strategy", "report")
-        scenarios = [
-            Scenario(
-                name=item.get("name"),
-                schema=item,
-                inventory=inventory,
-                k8s_inventory=k8s_inventory,
-                driver=driver,
-                executor=executor,
-                metric_collector=metric_collector
-            )
-            for item in policy.get("scenarios", [])
-        ]
+        policy = load_policy_fn()
+        loops = policy.get("config", {}).get("runStrategy", {}).get("runs", None)
         while loops is None or loops > 0:
+            policy = load_policy_fn()
+            config = policy.get("config", {}).get("runStrategy", {})
+            should_randomize = config.get("strategy") == "random"
+            wait_min = config.get("minSecondsBetweenRuns", 0)
+            wait_max = config.get("maxSecondsBetweenRuns", 300)
+            exitConfig = policy.get("config", {}).get("exitStrategy", {})
+            exitStrategy = exitConfig.get("strategy", "report")
+            scenarios = [
+                Scenario(
+                    name=item.get("name"),
+                    schema=item,
+                    inventory=inventory,
+                    k8s_inventory=k8s_inventory,
+                    driver=driver,
+                    executor=executor,
+                    metric_collector=metric_collector
+                )
+                for item in policy.get("scenarios", [])
+            ]
+
             if not scenarios:
                 return True
             if should_randomize:
